@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    {% include "alerts.html" %}
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Interact</h1>
+            <p>Test plugins and expected behaviour by sending audio or text queries to Eva through the Web UI.</p>
+            <h4>Send Text</h4>
+            <div class="input-group send-text">
+                <span class="input-group-btn">
+                    <button type="button" class="btn btn-primary" id="voice-recognition" onclick="voice_recognition()">Voice Recognition</button>
+                </span>
+                <input type="text" class="form-control" name="text" id="text" placeholder="Enter text here..."></input>
+                <span class="input-group-btn">
+                    <button type="button" class="btn btn-primary" id="send-text" onclick="send_text()">Send Text</button>
+                </span>
+            </div><br />
+            <h4>Send Audio</h4>
+            <div class="send-audio">
+                <button type="button" class="btn btn-primary" id="record-audio" onclick="record_audio()">Record Audio</button>
+                <button type="button" class="btn btn-default" id="play-audio" onclick="play_audio()">Play Audio</button>
+                <button type="button" class="btn btn-primary" style="float: right;" id="send-audio" onclick="send_audio()">Send Audio</button>
+            </div><br />
+            <h4>Eva Response</h4>
+            <div class="form-group eva-response">
+                <input type="checkbox" name="audio-response" id="audio-response" value="1" checked> Play Audio Response (a Text-to-Speech plugin must be enabled)</input>
+                <textarea class="form-control" name="response" id="response" placeholder="Eva's response will appear here..."></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script src="/interact/recorder.js"></script>
+    <script>
+        window.AudioContext = window.AudioContext || window.webkitAudioContext;
+        var audioContext = new AudioContext();
+        var audioInput = null,
+            realAudioInput = null,
+            inputPoint = null,
+            audioRecorder = null,
+            lastBlob = null,
+            blobURL = null,
+            audioWav = null;
+
+        // Used for browser-based speech recognition.
+        var recognition;
+
+        function gotStream(stream) {
+            inputPoint = audioContext.createGain();
+
+            // Create an AudioNode from the stream.
+            realAudioInput = audioContext.createMediaStreamSource(stream);
+            audioInput = realAudioInput;
+            audioInput.connect(inputPoint);
+
+            audioRecorder = new Recorder(inputPoint, {numChannels: 1});
+            zeroGain = audioContext.createGain();
+            zeroGain.gain.value = 0.0;
+            inputPoint.connect(zeroGain);
+            zeroGain.connect(audioContext.destination);
+        }
+
+        function initAudio() {
+            if (!navigator.getUserMedia)
+                navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+            if (!navigator.cancelAnimationFrame)
+                navigator.cancelAnimationFrame = navigator.webkitCancelAnimationFrame || navigator.mozCancelAnimationFrame;
+            if (!navigator.requestAnimationFrame)
+                navigator.requestAnimationFrame = navigator.webkitRequestAnimationFrame || navigator.mozRequestAnimationFrame;
+
+            navigator.getUserMedia({
+                "audio": {
+                    "mandatory": {
+                        "googEchoCancellation": "false",
+                        "googAutoGainControl": "false",
+                        "googNoiseSuppression": "false",
+                        "googHighpassFilter": "false"
+                    },
+                    "optional": []
+                },
+            }, gotStream, function(e) {
+                alert('Error getting audio');
+                console.log(e);
+            });
+        }
+
+        function send_text() {
+            var text = $('#text').val();
+            var parameters = {'input_text': text};
+            $.ajax({
+                url: '/interact/text',
+                data: parameters,
+                success: handle_response,
+                dataType: "json"
+            });
+        }
+
+        function record_audio() {
+            var btn = $('#record-audio');
+            if (btn.text() == 'Stop Recording') {
+                btn.addClass('btn-primary');
+                btn.removeClass('btn-danger');
+                btn.text('Record Audio')
+                audioRecorder.stop();
+                audioRecorder.exportWAV(done_recording);
+            } else {
+                if (!audioRecorder) return;
+                btn.removeClass('btn-primary');
+                btn.addClass('btn-danger');
+                btn.text('Stop Recording')
+                audioRecorder.clear();
+                audioRecorder.record();
+            }
+        }
+
+        function play_audio() {
+            if (audioWav) {
+                audioWav.play();
+            } else {
+                alert('No audio recorded yet');
+            }
+        }
+
+        function send_audio() {
+            if (lastBlob) {
+                var fd = new FormData();
+                fd.append('data', lastBlob);
+                $.ajax({
+                    type: 'POST',
+                    url: '/interact/audio',
+                    data: fd,
+                    processData: false,
+                    contentType: false,
+                    cache: false,
+                    success: handle_response,
+
+                });
+            } else {
+                alert('No audio recorded yet');
+            }
+        }
+
+        function handle_response(data) {
+            console.log('Eva Response:');
+            console.log(data);
+            if (!data['output_audio'] && !data['output_text']) {
+                alert('No response from Eva - ensure you have enabled the appropriate plugins');
+            } else {
+                $('#response').val(data['output_text']);
+                // Handle audio somehow...
+                if (data['output_audio'] && $('#audio-response').is(':checked')) {
+                    // Play audio file.
+                    var evaAudioResponse = new Audio('/interact/response-audio');
+                    evaAudioResponse.play();
+                }
+            }
+        }
+
+        function done_recording(blob) {
+            lastBlob = blob;
+            blobURL = window.URL.createObjectURL(blob);
+            audioWav = new Audio(blobURL);
+        }
+
+        function voice_recognition() {
+            if (recognition === undefined) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.onresult = function(event) {
+                    console.log(event);
+                    var result = '';
+                    for (var i = 0; i < event.results.length; i++) {
+                        transcript = event.results[i][0]['transcript'];
+                        result += transcript;
+                    }
+                    $('#text').val(result);
+                };
+                recognition.start();
+                $('#voice-recognition').addClass('btn-danger');
+                $('#voice-recognition').removeClass('btn-primary');
+                $('#voice-recognition').text('Stop Recording');
+            } else {
+                recognition.stop();
+                $('#voice-recognition').addClass('btn-primary');
+                $('#voice-recognition').removeClass('btn-danger');
+                $('#voice-recognition').text('Voice Recognition');
+                recognition = undefined;
+            }
+        }
+
+        window.addEventListener('load', initAudio);
+        $(document).ready(function() {
+            // Hide Voice Recognition button for unsupported browsers.
+            if (!('webkitSpeechRecognition' in window)) {
+                $('#voice-recognition').parent().remove();
+            }
+        });
+    </script>
+{% endblock %}

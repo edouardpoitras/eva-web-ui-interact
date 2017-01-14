@@ -1,0 +1,4 @@
+name = Web UI Interact
+description = Allows your to interact with Eva through the Web UI.
+version = 0.1.0
+dependencies = web_ui
