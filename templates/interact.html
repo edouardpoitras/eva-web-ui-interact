@@ -19,13 +19,14 @@
             </div><br />
             <h4>Send Audio</h4>
             <div class="send-audio">
+                <p>A voice recognition plugin must be enabled to use this feature.</p>
                 <button type="button" class="btn btn-primary" id="record-audio" onclick="record_audio()">Record Audio</button>
                 <button type="button" class="btn btn-default" id="play-audio" onclick="play_audio()">Play Audio</button>
                 <button type="button" class="btn btn-primary" style="float: right;" id="send-audio" onclick="send_audio()">Send Audio</button>
             </div><br />
             <h4>Eva Response</h4>
             <div class="form-group eva-response">
-                <input type="checkbox" name="audio-response" id="audio-response" value="1" checked> Play Audio Response (a Text-to-Speech plugin must be enabled)</input>
+                <input type="checkbox" name="audio-response" id="audio-response" value="1" checked> Play Audio Response (a Text-to-Speech plugin must be enabled to use this feature).</input>
                 <textarea class="form-control" name="response" id="response" placeholder="Eva's response will appear here..."></textarea>
             </div>
         </div>
