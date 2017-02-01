@@ -5,6 +5,8 @@ An Eva plugin that allows users to interact with Eva through the Web UI.
 
 Useful for testing out new plugins without needing to send audio through clients.
 
+![Web UI Interact](/screenshot.png?raw=true "https://127.0.0.1:8080/interact")
+
 ## Installation
 
 Can be easily installed through the Web UI by using [Web UI Plugins](https://github.com/edouardpoitras/eva-web-ui-plugins).
